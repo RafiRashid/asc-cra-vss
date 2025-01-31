@@ -25,12 +25,32 @@ def extract_text_from_pdf(pdf_file):
             full_text += page.extract_text()
     return full_text
 
+def extract_text_from_pdf_table(pdf_file):
+    with pdfplumber.open(pdf_file) as pdf:
+        first_page = pdf.pages[0]
+        text = first_page.extract_text()
+        nom_orga = [line.split("Nom de l’organisme")[1].strip() for line in text.split('\n') if "Nom de l’organisme" in line]
+        num_agrement = ["NA-" + line.split("NA-")[1].strip() for line in text.split('\n') if "NA-" in line]
+        return nom_orga, num_agrement
+
 def extract_text_from_docx(docx_file):
     doc = docx.Document(docx_file)
     full_text = "\n".join([para.text for para in doc.paragraphs])
     full_text = full_text.replace('\xa0',' ')
     return full_text
 
+def extract_text_from_docx_table(docx_file):
+    doc = docx.Document(docx_file)
+    table1 = doc.tables[0]
+    l = []
+    nom_orga = []
+    for rows in table1.rows:
+        for cells in rows.cells:
+            l.append(cells.text)
+    num_agrement = [l[2]]
+    nom_orga = [l[5]]
+
+    return nom_orga, num_agrement
 
 def extract_info_from_text(full_text, question):
     
@@ -62,16 +82,19 @@ if uploaded_files:
     for uploaded_file in uploaded_files:
         if uploaded_file.type == "application/pdf":
             full_text = extract_text_from_pdf(uploaded_file)
+            nom_orga, num_agrement = extract_text_from_pdf_table(uploaded_file)
         elif uploaded_file.type == "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
             full_text = extract_text_from_docx(uploaded_file)
+            nom_orga, num_agrement = extract_text_from_docx_table(uploaded_file)
         else:
             continue
         
         answers = extract_info_from_text(full_text, question)
-        results.append([uploaded_file.name] + answers)
+        results.append(nom_orga + num_agrement + answers)
     
     # Création du DataFrame
-    df = pd.DataFrame(results, columns=["Nom du fichier", 
+    df = pd.DataFrame(results, columns=["Nom de l'organisme", 
+                                        "Numéro de l'agrément",
                                         "Existe-t-il un plan de prévention des VSS au sein de votre organisme ?", 
                                         "Vos tuteurs ont-ils été sensibilisés à ce thème ? Votre organisme serait-il intéressé parun module dédié dans le cadre de l’accompagnement des tuteurs ?", 
                                         "Vos volontaires ont-ils été sensibilisés à ce thème ? Si oui, comment ?", 
