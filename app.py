@@ -17,7 +17,7 @@ st.set_page_config(
 
 question = "Existe-t-il un plan de prévention des VSS au sein de votre organisme ?"
 
-# Fonctions pour extraire tout le texte d'un fichier PDF ou WORD
+# Fonctions pour extraire tout le texte du CRA en PDF
 def extract_text_from_pdf(pdf_file):
     with pdfplumber.open(pdf_file) as pdf:
         full_text = ""
@@ -25,20 +25,24 @@ def extract_text_from_pdf(pdf_file):
             full_text += page.extract_text()
     return full_text
 
+# Fonctions pour extraire le nom de l'OA, le n°agrément et l'année du CRA en PDF
 def extract_text_from_pdf_table(pdf_file):
     with pdfplumber.open(pdf_file) as pdf:
         first_page = pdf.pages[0]
         text = first_page.extract_text()
         nom_orga = [line.split("Nom de l’organisme")[1].strip() for line in text.split('\n') if "Nom de l’organisme" in line]
         num_agrement = ["NA-" + line.split("NA-")[1].strip() for line in text.split('\n') if "NA-" in line]
-        return nom_orga, num_agrement
+        annee = [line.split("ANNÉE :")[1].strip() for line in text.split('\n') if "ANNÉE :" in line]
+        return nom_orga, num_agrement, annee
 
+# Fonctions pour extraire tout le texte du CRA en DOCX
 def extract_text_from_docx(docx_file):
     doc = docx.Document(docx_file)
     full_text = "\n".join([para.text for para in doc.paragraphs])
     full_text = full_text.replace('\xa0',' ')
     return full_text
 
+# Fonctions pour extraire le nom de l'OA, le n°agrément et l'année du CRA en DOCX
 def extract_text_from_docx_table(docx_file):
     doc = docx.Document(docx_file)
     table1 = doc.tables[0]
@@ -49,9 +53,11 @@ def extract_text_from_docx_table(docx_file):
             l.append(cells.text)
     num_agrement = [l[2]]
     nom_orga = [l[5]]
+    annee = [l[21].split("année")[1].strip()]
 
-    return nom_orga, num_agrement
+    return nom_orga, num_agrement, annee
 
+# Fonctions pour extraire les réponses aux questions sur les VSS dans le CRA
 def extract_info_from_text(full_text, question):
     
     #num_agrement = ["NA-" + full_text.split("NA-", 1)[1].split("\n",1)[0]]
@@ -68,33 +74,34 @@ def extract_info_from_text(full_text, question):
     return answers
 
 
-# Interface utilisateur avec Streamlit
+# UI Streamlit
 st.title("Extraction des données sur les VSS")
 st.write("Chargez plusieurs CRA au format PDF ou DOCX.")
 
-# Champ pour télécharger plusieurs fichiers
+# Champ pour déposer plusieurs fichiers au format PDF ou DOCX
 uploaded_files = st.file_uploader("Déposez vos fichiers PDF ou DOCX ici", type=["pdf", "docx"], accept_multiple_files=True)
 
-# Vérification et extraction
+# Test du type de fichier, puis extraire les données
 if uploaded_files:
     results = []
     
     for uploaded_file in uploaded_files:
         if uploaded_file.type == "application/pdf":
             full_text = extract_text_from_pdf(uploaded_file)
-            nom_orga, num_agrement = extract_text_from_pdf_table(uploaded_file)
+            nom_orga, num_agrement, annee = extract_text_from_pdf_table(uploaded_file)
         elif uploaded_file.type == "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
             full_text = extract_text_from_docx(uploaded_file)
-            nom_orga, num_agrement = extract_text_from_docx_table(uploaded_file)
+            nom_orga, num_agrement, annee = extract_text_from_docx_table(uploaded_file)
         else:
             continue
         
         answers = extract_info_from_text(full_text, question)
-        results.append(nom_orga + num_agrement + answers)
+        results.append(nom_orga + num_agrement + annee + answers)
     
     # Création du DataFrame
     df = pd.DataFrame(results, columns=["Nom de l'organisme", 
                                         "Numéro de l'agrément",
+                                        "Année du CRA",
                                         "Existe-t-il un plan de prévention des VSS au sein de votre organisme ?", 
                                         "Vos tuteurs ont-ils été sensibilisés à ce thème ? Votre organisme serait-il intéressé parun module dédié dans le cadre de l’accompagnement des tuteurs ?", 
                                         "Vos volontaires ont-ils été sensibilisés à ce thème ? Si oui, comment ?", 
