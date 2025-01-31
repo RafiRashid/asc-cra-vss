@@ -45,6 +45,7 @@ def extract_text_from_docx(docx_file):
 # Fonctions pour extraire le nom de l'OA, le n°agrément et l'année du CRA en DOCX
 def extract_text_from_docx_table(docx_file):
     doc = docx.Document(docx_file)
+    full_text = "\n".join([para.text for para in doc.paragraphs]).replace('\xa0',' ')
     table1 = doc.tables[0]
     l = []
     nom_orga = []
@@ -53,7 +54,7 @@ def extract_text_from_docx_table(docx_file):
             l.append(cells.text)
     num_agrement = [l[2]]
     nom_orga = [l[5]]
-    annee = [l[21].split("année")[1].strip()]
+    annee = [line.split("ANNÉE :")[1].strip() for line in full_text.split('\n') if "ANNÉE :" in line]
 
     return nom_orga, num_agrement, annee
 
